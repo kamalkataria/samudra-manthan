@@ -20,9 +20,8 @@ from .client import get_gmail_service
 
 LIST_PAGE_SIZE = 500
 
-# Keep this at 20 because your Gmail API setup is
-# accepting this batch size reliably.
-BATCH_SIZE = 20
+# Set to 100 (Maximum limit allowed by Google BatchHttpRequest)
+BATCH_SIZE = 100
 
 # Number of times to retry a temporarily failed message.
 MAX_RETRIES = 5

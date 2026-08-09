@@ -7,6 +7,11 @@ name = "samudra-manthan"
 version = "0.1.0"
 description = "An open-source Gmail cleanup utility."
 requires-python = ">=3.12"
+dependencies = [
+    "google-api-python-client>=2.198.0",
+    "google-auth-httplib2",
+    "google-auth-oauthlib",
+]
 
 [project.scripts]
 sm = "samudra_manthan.main:main"

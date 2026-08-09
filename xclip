@@ -57,6 +57,3 @@ __pycache__/
 *.py[cod]
 .venv/
 *.egg-info/
-
-# Samudra Manthan local session
-.samudra_manthan_session

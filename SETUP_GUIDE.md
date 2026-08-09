@@ -23,6 +23,7 @@ You need **Python 3.10 or higher** installed on your computer.
 4. Ensure your Python package manager (`pip`) is ready and updated:
    ```bash
    python -m pip install --upgrade pip
+      
    ```
 
 ---

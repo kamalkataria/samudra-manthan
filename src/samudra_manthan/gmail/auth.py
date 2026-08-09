@@ -9,7 +9,8 @@ from googleapiclient.discovery import build
 
 
 SCOPES = [
-    "https://www.googleapis.com/auth/gmail.modify",
+    # "https://www.googleapis.com/auth/gmail.modify",
+    "https://mail.google.com/",
 ]
 
 

@@ -6,11 +6,13 @@ from samudra_manthan.gmail.auth import (
     logout_gmail,
 )
 from samudra_manthan.gmail.cleanup import (
-    plan_delete_all,
+    plan_delete_received,
+    plan_delete_sent,
     trash_messages,
+    empty_gmail_trash,
 )
 from samudra_manthan.gmail.messages import scan_mailbox
-from samudra_manthan.review import review_mode
+from samudra_manthan.review import review_mode, review_sent_mode
 
 
 # ---------------------------------------------------------
@@ -18,512 +20,199 @@ from samudra_manthan.review import review_mode
 # ---------------------------------------------------------
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+ACCOUNTS_DIR = PROJECT_ROOT / "data" / "accounts"
 
-ACCOUNTS_DIR = (
-    PROJECT_ROOT
-    / "data"
-    / "accounts"
-)
-
-
-# ---------------------------------------------------------
-# ACCOUNT
-# ---------------------------------------------------------
 
 def get_logged_in_account() -> str | None:
-    """Return the currently authenticated Gmail account."""
-
     try:
         return get_gmail_account()
-
     except Exception:
         return None
 
 
 def get_account_directory() -> Path:
-    """Return the data directory for the current Gmail account."""
-
     account = get_gmail_account()
-
     safe_account = (
-        account
-        .strip()
-        .lower()
-        .replace("@", "_")
-        .replace("/", "_")
-        .replace("\\", "_")
-        .replace(":", "_")
+        account.strip().lower()
+        .replace("@", "_").replace("/", "_")
+        .replace("\\", "_").replace(":", "_")
     )
-
-    account_dir = (
-        ACCOUNTS_DIR
-        / safe_account
-    )
-
-    account_dir.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
+    account_dir = ACCOUNTS_DIR / safe_account
+    account_dir.mkdir(parents=True, exist_ok=True)
     return account_dir
 
 
-# ---------------------------------------------------------
-# ACCOUNT-SPECIFIC SESSION
-# ---------------------------------------------------------
-
 def get_session_file() -> Path:
-    """Return the protection-session file for the current account."""
-
-    return (
-        get_account_directory()
-        / ".samudra_manthan_session"
-    )
+    return get_account_directory() / ".samudra_manthan_session"
 
 
-def save_session_label(
-    label_name: str,
-) -> None:
-    """Save the current protection session for this account."""
-
+def save_session_label(label_name: str) -> None:
     session_file = get_session_file()
-
-    session_file.write_text(
-        label_name.strip() + "\n",
-        encoding="utf-8",
-    )
+    session_file.write_text(label_name.strip() + "\n", encoding="utf-8")
 
 
 def load_session_label() -> str | None:
-    """Load the protection session for this account."""
-
     session_file = get_session_file()
-
     if not session_file.exists():
         return None
-
-    label = (
-        session_file
-        .read_text(
-            encoding="utf-8",
-        )
-        .strip()
-    )
-
+    label = session_file.read_text(encoding="utf-8").strip()
     return label or None
 
 
 # ---------------------------------------------------------
-# SCAN / REFRESH
+# MODES
 # ---------------------------------------------------------
 
 def scan_mode() -> None:
-    """Scan the current Gmail account into its SQLite database."""
-
-    print()
-    print("=" * 60)
+    print("\n" + "=" * 60)
     print("SAMUDRA MANTHAN — SCAN / REFRESH")
-    print("=" * 60)
-    print()
+    print("=" * 60 + "\n")
 
     account = get_logged_in_account()
-
     if not account:
-        print(
-            "No Gmail account is currently connected."
-        )
-        print(
-            "Login first."
-        )
-        print()
+        print("No Gmail account is currently connected.\nLogin first.\n")
         return
 
-    print(
-        "Scanning account:"
-    )
-    print(
-        f"  {account}"
-    )
-    print()
-
-    print(
-        "Account data directory:"
-    )
-    print(
-        f"  {get_account_directory()}"
-    )
-    print()
-
-    print(
-        "Refreshing local Gmail index..."
-    )
-    print()
+    print(f"Scanning account:\n  {account}\n")
+    print(f"Account data directory:\n  {get_account_directory()}\n")
+    print("Refreshing local Gmail index...\n")
 
     try:
         scan_mailbox()
-
     except Exception as exc:
-        print()
-        print(
-            f"Scan failed: {exc}"
-        )
-        print()
+        print(f"\nScan failed: {exc}\n")
         return
 
-    print()
-    print("=" * 60)
+    print("\n" + "=" * 60)
     print("SCAN COMPLETE")
-    print("=" * 60)
-    print()
+    print("=" * 60 + "\n")
+    print(f"Account: {account}")
+    print(f"Database: {get_account_directory()}\n")
 
-    print(
-        f"Account: {account}"
-    )
-
-    print(
-        f"Database: {get_account_directory()}"
-    )
-
-    print()
-
-
-# ---------------------------------------------------------
-# LOGIN
-# ---------------------------------------------------------
 
 def login_mode() -> None:
-    """Open Google OAuth login and display the connected account."""
-
-    print()
-    print("=" * 60)
+    print("\n" + "=" * 60)
     print("SAMUDRA MANTHAN — GOOGLE LOGIN")
-    print("=" * 60)
-    print()
-
-    print(
-        "Opening Google authentication..."
-    )
-    print()
+    print("=" * 60 + "\n")
+    print("Opening Google authentication...\n")
 
     try:
         account = login_gmail()
-
     except Exception as exc:
-        print()
-        print(
-            f"Google login failed: {exc}"
-        )
-        print()
+        print(f"\nGoogle login failed: {exc}\n")
         return
 
-    print()
-    print("=" * 60)
+    print("\n" + "=" * 60)
     print("LOGIN SUCCESSFUL")
-    print("=" * 60)
-    print()
+    print("=" * 60 + "\n")
+    print(f"Connected Gmail account:\n  {account}\n")
+    print(f"Account data directory:\n  {get_account_directory()}\n")
 
-    print(
-        "Connected Gmail account:"
-    )
-    print(
-        f"  {account}"
-    )
-
-    print()
-
-    print(
-        "Account data directory:"
-    )
-    print(
-        f"  {get_account_directory()}"
-    )
-
-    print()
-
-
-# ---------------------------------------------------------
-# LOGOUT
-# ---------------------------------------------------------
 
 def logout_mode() -> None:
-    """Log out the currently connected Gmail account."""
-
-    print()
-    print("=" * 60)
+    print("\n" + "=" * 60)
     print("SAMUDRA MANTHAN — LOGOUT")
-    print("=" * 60)
-    print()
+    print("=" * 60 + "\n")
 
     account = get_logged_in_account()
-
     if not account:
-        print(
-            "No Gmail account is currently connected."
-        )
-        print()
+        print("No Gmail account is currently connected.\n")
         return
 
-    print(
-        "Current account:"
-    )
-    print(
-        f"  {account}"
-    )
-    print()
+    print(f"Current account:\n  {account}\n")
+    confirmation = input("Logout this account? [y/N] > ").strip().lower()
 
-    confirmation = input(
-        "Logout this account? [y/N] > "
-    ).strip().lower()
-
-    if confirmation not in (
-        "y",
-        "yes",
-    ):
-        print()
-        print(
-            "Logout cancelled."
-        )
-        print()
+    if confirmation not in ("y", "yes"):
+        print("\nLogout cancelled.\n")
         return
 
     logout_gmail()
-
-    print()
-    print(
-        "Logged out successfully."
-    )
-    print()
+    print("\nLogged out successfully.\n")
 
 
-# ---------------------------------------------------------
-# DELETE MODE
-# ---------------------------------------------------------
+def review_and_save(mode="received") -> None:
+    account = get_logged_in_account()
+    if not account:
+        print("\nNo Gmail account connected.\nLogin first.\n")
+        return
 
-def delete_mode() -> None:
-    """
-    Preview and optionally move all unprotected messages
-    for the current Gmail account to Trash.
-    """
+    print(f"\nReviewing account:\n  {account}\n")
+    print(f"Account data directory:\n  {get_account_directory()}\n")
 
-    print()
-    print("=" * 60)
-    print("SAMUDRA MANTHAN — DELETE MODE")
-    print("=" * 60)
-    print()
+    if mode == "sent":
+        label_name = review_sent_mode()
+    else:
+        label_name = review_mode()
+
+    if label_name:
+        save_session_label(label_name)
+        print(f"\nActive session saved: {label_name}")
+        print("Delete Mode will use this session for this account only.\n")
+
+
+def delete_mode(mode="received") -> None:
+    print("\n" + "=" * 60)
+    print(f"SAMUDRA MANTHAN — DELETE MODE ({mode.upper()})")
+    print("=" * 60 + "\n")
 
     account = get_logged_in_account()
-
     if not account:
-        print(
-            "No Gmail account connected."
-        )
-        print(
-            "Login first."
-        )
-        print()
+        print("No Gmail account connected.\nLogin first.\n")
         return
 
-    print(
-        "Connected Gmail account:"
-    )
-    print(
-        f"  {account}"
-    )
-    print()
-
-    print(
-        "Account database:"
-    )
-    print(
-        f"  {get_account_directory()}"
-    )
-    print()
+    print(f"Connected Gmail account:\n  {account}\n")
+    print(f"Account database:\n  {get_account_directory()}\n")
 
     protected_label = load_session_label()
-
     if not protected_label:
-        print(
-            "No active protection session found "
-            "for this account."
-        )
-        print()
-        print(
-            "Run Review & Protect first."
-        )
-        print()
+        print("No active protection session found for this account.\n\nRun Review & Protect first.\n")
         return
 
-    print(
-        "Current protection label:"
-    )
-    print(
-        f"  {protected_label}"
-    )
-    print()
-
-    print(
-        "Scanning mailbox..."
-    )
-    print()
+    print(f"Current protection label:\n  {protected_label}\n")
+    print("Scanning mailbox...\n")
 
     try:
-        deletable, protected = (
-            plan_delete_all(
-                protected_label
-            )
-        )
-
+        if mode == "sent":
+            deletable, protected = plan_delete_sent(protected_label, account)
+        else:
+            deletable, protected = plan_delete_received(protected_label, account)
     except Exception as exc:
-        print()
-        print(
-            f"Delete planning failed: {exc}"
-        )
-        print()
+        print(f"\nDelete planning failed: {exc}\n")
         return
 
-    total = (
-        len(deletable)
-        + len(protected)
-    )
+    total = len(deletable) + len(protected)
 
     print("=" * 60)
     print("DELETE PREVIEW")
-    print("=" * 60)
-    print()
-
-    print(
-        f"Total messages:     {total:,}"
-    )
-
-    print(
-        f"Protected:          {len(protected):,}"
-    )
-
-    print(
-        f"Will move to Trash: {len(deletable):,}"
-    )
-
-    print()
+    print("=" * 60 + "\n")
+    print(f"Total messages:     {total:,}")
+    print(f"Protected:          {len(protected):,}")
+    print(f"Will move to Trash: {len(deletable):,}\n")
 
     if not deletable:
-        print(
-            "Nothing will be moved to Trash."
-        )
-        print()
+        print("Nothing will be moved to Trash.\n")
         return
 
-    print(
-        "Only messages carrying the current "
-        "protection label are excluded."
-    )
-    print()
+    print("Only messages carrying the current protection label are excluded.\n")
+    confirmation = input("Move ALL unprotected messages to Trash? [y/N] > ").strip().lower()
 
-    confirmation = input(
-        "Move ALL unprotected messages to Trash? [y/N] > "
-    ).strip().lower()
-
-    if confirmation not in (
-        "y",
-        "yes",
-    ):
-        print()
-        print(
-            "Delete cancelled."
-        )
-        print()
+    if confirmation not in ("y", "yes"):
+        print("\nDelete cancelled.\n")
         return
 
-    print()
-    print(
-        "Moving messages to Trash..."
-    )
-    print()
+    print("\nMoving messages to Trash...\n")
 
     try:
-        moved = trash_messages(
-            deletable
-        )
-
+        moved = trash_messages(deletable)
     except Exception as exc:
-        print()
-        print(
-            f"Trash operation failed: {exc}"
-        )
-        print()
+        print(f"\nTrash operation failed: {exc}\n")
         return
 
-    print()
-    print("=" * 60)
+    print("\n" + "=" * 60)
     print("DELETE COMPLETE")
-    print("=" * 60)
-    print()
-
-    print(
-        f"Moved to Trash: {moved:,}"
-    )
-
-    print(
-        f"Protected:      {len(protected):,}"
-    )
-
-    print()
-
-
-# ---------------------------------------------------------
-# REVIEW & PROTECT
-# ---------------------------------------------------------
-
-def review_and_save() -> None:
-    """Run Review Mode and save its session label for this account."""
-
-    account = get_logged_in_account()
-
-    if not account:
-        print()
-        print(
-            "No Gmail account connected."
-        )
-        print(
-            "Login first."
-        )
-        print()
-        return
-
-    print()
-    print(
-        "Reviewing account:"
-    )
-    print(
-        f"  {account}"
-    )
-    print()
-
-    print(
-        "Account data directory:"
-    )
-    print(
-        f"  {get_account_directory()}"
-    )
-    print()
-
-    label_name = review_mode()
-
-    if label_name:
-        save_session_label(
-            label_name
-        )
-
-        print()
-        print(
-            f"Active session saved: {label_name}"
-        )
-
-        print(
-            "Delete Mode will use this "
-            "session for this account only."
-        )
-
-        print()
+    print("=" * 60 + "\n")
+    print(f"Moved to Trash: {moved:,}")
+    print(f"Protected:      {len(protected):,}\n")
 
 
 # ---------------------------------------------------------
@@ -531,182 +220,78 @@ def review_and_save() -> None:
 # ---------------------------------------------------------
 
 def main() -> None:
-    """Main Samudra Manthan application."""
-
     while True:
+        account = get_logged_in_account()
 
-        account = (
-            get_logged_in_account()
-        )
-
-        print()
-        print("=" * 60)
+        print("\n" + "=" * 60)
         print("SAMUDRA MANTHAN")
         print("=" * 60)
-        print(
-            "The open-source Gmail cleanup utility"
-        )
-        print(
-            "Version: 0.1.0"
-        )
-        print("=" * 60)
-        print()
-
-        # -------------------------------------------------
-        # LOGGED IN
-        # -------------------------------------------------
+        print("The open-source Gmail cleanup utility")
+        print("Version: 0.1.0")
+        print("=" * 60 + "\n")
 
         if account:
+            print(f"Connected Gmail account:\n  {account}\n")
+            print(f"Account data directory:\n  {get_account_directory()}\n")
 
-            print(
-                "Connected Gmail account:"
-            )
-            print(
-                f"  {account}"
-            )
-            print()
-
-            print(
-                "Account data directory:"
-            )
-            print(
-                f"  {get_account_directory()}"
-            )
-            print()
-
-            current_label = (
-                load_session_label()
-            )
-
+            current_label = load_session_label()
             if current_label:
-
-                print(
-                    "Active protection session:"
-                )
-                print(
-                    f"  {current_label}"
-                )
-                print()
-
+                print(f"Active protection session:\n  {current_label}\n")
             else:
+                print("No active protection session for this account.\n")
 
-                print(
-                    "No active protection session "
-                    "for this account."
-                )
-                print()
+            print("1. Scan / Refresh Gmail")
+            print("2. Review & Protect (Inbox)")
+            print("3. Delete Unprotected (Inbox)")
+            print("4. Review & Protect (Sentbox)")
+            print("5. Delete Unprotected (Sentbox)")
+            print("6. Empty Trash (Permanent)")
+            print("7. Logout")
+            print("8. Exit\n")
 
-            print(
-                "1. Scan / Refresh Gmail"
-            )
-
-            print(
-                "2. Review & Protect"
-            )
-
-            print(
-                "3. Delete"
-            )
-
-            print(
-                "4. Logout"
-            )
-
-            print(
-                "5. Exit"
-            )
-
-            print()
-
-            choice = input(
-                "Select > "
-            ).strip().lower()
+            choice = input("Select > ").strip().lower()
 
             if choice == "1":
-
                 scan_mode()
-
             elif choice == "2":
-
-                review_and_save()
-
+                review_and_save(mode="received")
             elif choice == "3":
-
-                delete_mode()
-
+                delete_mode(mode="received")
             elif choice == "4":
-
+                review_and_save(mode="sent")
+            elif choice == "5":
+                delete_mode(mode="sent")
+            elif choice == "6":
+                print("\n" + "=" * 60)
+                print("EMPTY TRASH")
+                print("=" * 60 + "\n")
+                confirm = input(
+                    "PERMANENTLY delete everything in Trash? This cannot be undone. [y/N] > "
+                ).strip().lower()
+                if confirm in ("y", "yes"):
+                    empty_gmail_trash()
+            elif choice == "7":
                 logout_mode()
-
-            elif choice in (
-                "5",
-                "q",
-                "quit",
-                "exit",
-            ):
-
-                print()
-                print(
-                    "Goodbye."
-                )
+            elif choice in ("8", "q", "quit", "exit"):
+                print("\nGoodbye.")
                 return
-
             else:
-
-                print()
-                print(
-                    "Invalid choice."
-                )
-
-        # -------------------------------------------------
-        # LOGGED OUT
-        # -------------------------------------------------
+                print("\nInvalid choice.")
 
         else:
+            print("No Gmail account connected.\n")
+            print("1. Login with Google")
+            print("2. Exit\n")
 
-            print(
-                "No Gmail account connected."
-            )
-            print()
-
-            print(
-                "1. Login with Google"
-            )
-
-            print(
-                "2. Exit"
-            )
-
-            print()
-
-            choice = input(
-                "Select > "
-            ).strip().lower()
+            choice = input("Select > ").strip().lower()
 
             if choice == "1":
-
                 login_mode()
-
-            elif choice in (
-                "2",
-                "q",
-                "quit",
-                "exit",
-            ):
-
-                print()
-                print(
-                    "Goodbye."
-                )
+            elif choice in ("2", "q", "quit", "exit"):
+                print("\nGoodbye.")
                 return
-
             else:
-
-                print()
-                print(
-                    "Invalid choice."
-                )
-
+                print("\nInvalid choice.")
 
 if __name__ == "__main__":
     main()

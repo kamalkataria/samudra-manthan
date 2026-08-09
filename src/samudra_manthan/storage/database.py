@@ -31,9 +31,6 @@ def _safe_account_name(account: str) -> str:
 def get_current_gmail_account() -> str:
     """
     Return the Gmail account currently authenticated.
-
-    The import is intentionally inside the function to avoid
-    circular imports during application startup.
     """
 
     from samudra_manthan.gmail.auth import (
@@ -94,13 +91,89 @@ def get_connection():
     return connection
 
 
+# def initialize_database():
+#     """
+#     Create the database tables, indexes, and run migrations for existing schemas.
+#     """
+
+#     connection = get_connection()
+
+#     connection.executescript(
+#         """
+#         CREATE TABLE IF NOT EXISTS messages (
+#             id TEXT PRIMARY KEY,
+#             thread_id TEXT,
+#             sender_email TEXT NOT NULL,
+#             sender_name TEXT,
+#             recipient_email TEXT,
+#             subject TEXT,
+#             date TEXT,
+#             labels TEXT,
+#             trashed INTEGER NOT NULL DEFAULT 0
+#         );
+
+#         CREATE TABLE IF NOT EXISTS senders (
+#             email TEXT PRIMARY KEY,
+#             message_count INTEGER NOT NULL DEFAULT 0
+#         );
+
+#         CREATE INDEX IF NOT EXISTS idx_messages_sender
+#         ON messages(sender_email);
+
+#         CREATE INDEX IF NOT EXISTS idx_messages_recipient
+#         ON messages(recipient_email);
+
+#         CREATE INDEX IF NOT EXISTS idx_messages_date
+#         ON messages(date);
+#         """
+#     )
+
+#     # ---------------------------------------------------------
+#     # MIGRATIONS FOR OLD DATABASES
+#     # ---------------------------------------------------------
+
+#     columns = {
+#         row["name"]
+#         for row in connection.execute(
+#             "PRAGMA table_info(messages)"
+#         ).fetchall()
+#     }
+
+#     if "trashed" not in columns:
+#         connection.execute(
+#             """
+#             ALTER TABLE messages
+#             ADD COLUMN trashed INTEGER NOT NULL DEFAULT 0
+#             """
+#         )
+
+#     if "recipient_email" not in columns:
+#         connection.execute(
+#             """
+#             ALTER TABLE messages
+#             ADD COLUMN recipient_email TEXT
+#             """
+#         )
+
+#     connection.execute(
+#         """
+#         CREATE INDEX IF NOT EXISTS idx_messages_trashed
+#         ON messages(trashed)
+#         """
+#     )
+
+#     connection.commit()
+#     connection.close()
+
+
 def initialize_database():
     """
-    Create the database tables and indexes.
+    Create the database tables, indexes, and run migrations for existing schemas.
     """
 
     connection = get_connection()
 
+    # 1. Create base tables and safe indexes
     connection.executescript(
         """
         CREATE TABLE IF NOT EXISTS messages (
@@ -108,6 +181,7 @@ def initialize_database():
             thread_id TEXT,
             sender_email TEXT NOT NULL,
             sender_name TEXT,
+            recipient_email TEXT,
             subject TEXT,
             date TEXT,
             labels TEXT,
@@ -128,7 +202,7 @@ def initialize_database():
     )
 
     # ---------------------------------------------------------
-    # MIGRATION FOR OLD DATABASES
+    # 2. MIGRATIONS FOR OLD DATABASES
     # ---------------------------------------------------------
 
     columns = {
@@ -146,6 +220,18 @@ def initialize_database():
             """
         )
 
+    if "recipient_email" not in columns:
+        connection.execute(
+            """
+            ALTER TABLE messages
+            ADD COLUMN recipient_email TEXT
+            """
+        )
+
+    # ---------------------------------------------------------
+    # 3. CREATE INDEXES FOR MIGRATED COLUMNS
+    # ---------------------------------------------------------
+
     connection.execute(
         """
         CREATE INDEX IF NOT EXISTS idx_messages_trashed
@@ -153,9 +239,15 @@ def initialize_database():
         """
     )
 
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_messages_recipient
+        ON messages(recipient_email)
+        """
+    )
+
     connection.commit()
     connection.close()
-
 
 def save_messages(messages):
     """
@@ -200,12 +292,13 @@ def save_messages(messages):
             thread_id,
             sender_email,
             sender_name,
+            recipient_email,
             subject,
             date,
             labels,
             trashed
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         [
             (
@@ -219,6 +312,10 @@ def save_messages(messages):
                 ),
                 message.get(
                     "sender_name",
+                    "",
+                ),
+                message.get(
+                    "recipient_email",
                     "",
                 ),
                 message.get(

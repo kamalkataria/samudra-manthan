@@ -1,6 +1,7 @@
 # Python
 __pycache__/
 *.py[cod]
+*.egg-info/
 
 # Virtual Environment
 .venv/
@@ -9,29 +10,36 @@ venv/
 # Build
 build/
 dist/
-*.egg-info/
 
-# VS Code
+# IDEs
 .vscode/
-
-# JetBrains
 .idea/
 
 # Logs
 logs/
 *.log
 
-# Gmail Secrets
-credentials.json
-token.json
+# Environment Variables
+.env
 
-# Databases
+# Google OAuth credentials
+config/credentials.json
+config/token.json
+
+# OAuth tokens
+config/tokens/
+
+# Samudra Manthan local account/session state
+config/current_account
+config/selected_account
+.samudra_manthan_session
+
+# Local databases and backups
 *.db
 *.sqlite
 *.sqlite3
-
-# Environment Variables
-.env
+*.db.backup
+data/
 
 # Test Cache
 .pytest_cache/
@@ -45,18 +53,3 @@ htmlcov/
 # OS Files
 .DS_Store
 Thumbs.db
-
-# Google OAuth credentials
-config/credentials.json
-
-# OAuth tokens
-config/token.json
-
-# Python
-__pycache__/
-*.py[cod]
-.venv/
-*.egg-info/
-
-# Samudra Manthan local session
-.samudra_manthan_session

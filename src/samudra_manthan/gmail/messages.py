@@ -163,7 +163,13 @@ def get_message_metadata_batch(service, message_ids):
     def callback(request_id, response, exception):
         if exception is not None:
             failed_message_ids.append(request_id)
-            print(f"\nWarning: batch read failed for {request_id}: {exception}")
+            # print(f"\nWarning: batch read failed for {request_id}: {exception}")
+            status = getattr(exception.resp, "status", None) if hasattr(exception, "resp") else None
+            if status == 429:
+                print(f"\nSystem seems too fast for message {request_id}, cooling down and will retry shortly...")
+            else:
+                print(f"\nTemporary hiccup for message {request_id}, queuing for retry...")
+            return
             return
         try:
             messages.append(_parse_message(response))
@@ -207,6 +213,7 @@ def get_message_metadata_batch(service, message_ids):
 
         for number, message_id in enumerate(failed_message_ids, start=1):
             try:
+                print(f"\nTrying to recover failed messages")
                 message = _get_message_with_retry(service, message_id)
                 messages.append(_parse_message(message))
             except Exception as exc:
